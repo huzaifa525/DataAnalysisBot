@@ -8,214 +8,206 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder, RobustScaler
 from sklearn.impute import SimpleImputer, KNNImputer
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-import xgboost as xgb
-import re
-import nltk
-from nltk.tokenize import word_tokenize
-from nltk.corpus import stopwords
-import spacy
-import os
-
-
-# Download spaCy model if not present
-if not spacy.util.is_package("en_core_web_sm"):
-    os.system("python -m spacy download en_core_web_sm")
-
-# Load spaCy model
-nlp = spacy.load("en_core_web_sm")
-
-
-# Download required NLTK data
-nltk.download('punkt')
-nltk.download('stopwords')
-nltk.download('averaged_perceptron_tagger')
-
-# ML Models
-from sklearn.linear_model import (
-    LinearRegression, Ridge, Lasso, ElasticNet,
-    LogisticRegression, SGDClassifier
-)
-from sklearn.ensemble import (
-    RandomForestClassifier, RandomForestRegressor,
-    GradientBoostingClassifier, GradientBoostingRegressor,
-    AdaBoostClassifier, AdaBoostRegressor
-)
-from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
-from sklearn.svm import SVC, SVR
-from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
-from xgboost import XGBClassifier, XGBRegressor
-from lightgbm import LGBMClassifier, LGBMRegressor
-from sklearn.neural_network import MLPClassifier, MLPRegressor
-
-# Metrics
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
     mean_squared_error, r2_score, roc_auc_score, confusion_matrix
 )
+import re
+import nltk
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
 
-class EnhancedMLChatbot:
+# Download NLTK data
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt')
+try:
+    nltk.data.find('corpora/stopwords')
+except LookupError:
+    nltk.download('stopwords')
+
+# Machine Learning Models
+from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge, Lasso
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+from sklearn.svm import SVC, SVR
+from xgboost import XGBClassifier, XGBRegressor
+from sklearn.neural_network import MLPClassifier, MLPRegressor
+
+class MLChatbot:
     def __init__(self):
         self.data = None
         self.model = None
         self.target = None
         self.model_pipeline = None
         self.feature_importance = None
-        self.last_predictions = None
         
         # Available models
         self.regression_models = {
             'linear': LinearRegression(),
             'ridge': Ridge(),
             'lasso': Lasso(),
-            'elastic': ElasticNet(),
             'rf': RandomForestRegressor(),
             'xgboost': XGBRegressor(),
-            'lightgbm': LGBMRegressor(),
-            'gbm': GradientBoostingRegressor(),
             'svr': SVR(),
-            'knn': KNeighborsRegressor(),
             'mlp': MLPRegressor(),
-            'dt': DecisionTreeRegressor(),
-            'adaboost': AdaBoostRegressor()
+            'dt': DecisionTreeRegressor()
         }
         
         self.classification_models = {
             'logistic': LogisticRegression(),
             'rf': RandomForestClassifier(),
             'xgboost': XGBClassifier(),
-            'lightgbm': LGBMClassifier(),
-            'gbm': GradientBoostingClassifier(),
             'svc': SVC(probability=True),
-            'knn': KNeighborsClassifier(),
             'mlp': MLPClassifier(),
-            'dt': DecisionTreeClassifier(),
-            'adaboost': AdaBoostClassifier(),
-            'sgd': SGDClassifier(loss='modified_huber')
+            'dt': DecisionTreeClassifier()
         }
 
-    def preprocess_query(self, query):
-        """Advanced query preprocessing"""
-        # Tokenization
+    def process_query(self, query):
+        """Process natural language queries"""
+        query = query.lower()
+        tokens = word_tokenize(query)
+        
+        try:
+            # Data loading queries
+            if any(word in tokens for word in ['load', 'upload', 'import']):
+                return self.handle_data_upload()
+            
+            if st.session_state.data is None:
+                return "Please upload a dataset first! You can say 'load data' to upload a file."
+            
+            # Show data info
+            if 'show' in tokens and ('data' in tokens or 'info' in tokens):
+                return self.show_data_info()
+            
+            # Handle ML queries
+            if any(word in tokens for word in ['train', 'predict', 'model']):
+                return self.handle_ml_query(query)
+            
+            # Handle visualization queries
+            if any(word in tokens for word in ['plot', 'chart', 'graph', 'show']):
+                return self.handle_visualization(query)
+            
+            # Handle analysis queries
+            if any(word in tokens for word in ['analyze', 'analyse', 'statistics']):
+                return self.analyze_data(query)
+            
+            return ("I can help you with:\n"
+                   "1. Loading data ('load data')\n"
+                   "2. Showing data info ('show info')\n"
+                   "3. Training models ('train model to predict X')\n"
+                   "4. Creating visualizations ('show chart of X')\n"
+                   "5. Analyzing data ('analyze X')")
+            
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+    def handle_data_upload(self):
+        """Handle data upload"""
+        uploaded_file = st.file_uploader("Choose a CSV or Excel file", type=['csv', 'xlsx'])
+        
+        if uploaded_file:
+            try:
+                if uploaded_file.name.endswith('.csv'):
+                    data = pd.read_csv(uploaded_file)
+                else:
+                    data = pd.read_excel(uploaded_file)
+                
+                st.session_state.data = data
+                return (f"Dataset loaded! Shape: {data.shape}\n\n"
+                       f"Columns: {', '.join(data.columns)}\n\n"
+                       "You can now analyze this data!")
+            except Exception as e:
+                return f"Error loading file: {str(e)}"
+        return "Please upload a file to continue."
+
+    def handle_ml_query(self, query):
+        """Handle machine learning queries"""
         tokens = word_tokenize(query.lower())
         
-        # Remove stopwords
-        stop_words = set(stopwords.words('english'))
-        tokens = [token for token in tokens if token not in stop_words]
+        if 'train' in tokens:
+            # Extract target variable
+            target_index = tokens.index('predict') + 1 if 'predict' in tokens else -1
+            if target_index >= 0 and target_index < len(tokens):
+                target = tokens[target_index]
+                
+                # Find actual column name (case-insensitive)
+                target_col = None
+                for col in st.session_state.data.columns:
+                    if col.lower() == target:
+                        target_col = col
+                        break
+                
+                if target_col is None:
+                    return f"Column '{target}' not found. Available columns: {', '.join(st.session_state.data.columns)}"
+                
+                # Train model
+                return self.train_model(st.session_state.data, target_col)
+            
+            return "Please specify what to predict. Example: 'train model to predict price'"
+            
+        elif 'predict' in tokens and self.model_pipeline:
+            # Create prediction interface
+            st.write("Enter values for prediction:")
+            input_data = {}
+            for col in st.session_state.data.columns:
+                if col != self.target:
+                    input_data[col] = st.text_input(f"Enter {col}")
+            
+            if st.button("Predict"):
+                try:
+                    input_df = pd.DataFrame([input_data])
+                    prediction = self.model_pipeline.predict(input_df)
+                    return f"Prediction: {prediction[0]}"
+                except Exception as e:
+                    return f"Error making prediction: {str(e)}"
         
-        # POS tagging
-        pos_tags = nltk.pos_tag(tokens)
-        
-        # Extract key information using spaCy
-        doc = nlp(query)
-        
-        # Extract entities
-        entities = [(ent.text, ent.label_) for ent in doc.ents]
-        
-        return {
-            'tokens': tokens,
-            'pos_tags': pos_tags,
-            'entities': entities,
-            'doc': doc
-        }
+        return "Please train a model first or specify what you want to predict."
 
-    def extract_model_params(self, query_info):
-        """Extract model parameters from query"""
-        params = {}
-        text = ' '.join(query_info['tokens'])
-        
-        # Extract numerical parameters
-        numbers = re.findall(r'(\d+(?:\.\d+)?)', text)
-        
-        if 'estimator' in text or 'trees' in text:
-            params['n_estimators'] = int(numbers[0]) if numbers else 100
-            
-        if 'depth' in text:
-            params['max_depth'] = int(numbers[0]) if numbers else None
-            
-        if 'neighbor' in text:
-            params['n_neighbors'] = int(numbers[0]) if numbers else 5
-            
-        return params
-
-    def create_model_pipeline(self, X, model_type='auto'):
-        """Create preprocessing pipeline"""
-        numeric_features = X.select_dtypes(include=['int64', 'float64']).columns
-        categorical_features = X.select_dtypes(include=['object']).columns
-        
-        numeric_transformer = Pipeline(steps=[
-            ('imputer', KNNImputer()),
-            ('scaler', RobustScaler())
-        ])
-        
-        categorical_transformer = Pipeline(steps=[
-            ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
-            ('encoder', LabelEncoder())
-        ])
-        
-        preprocessor = ColumnTransformer(
-            transformers=[
-                ('num', numeric_transformer, numeric_features),
-                ('cat', categorical_transformer, categorical_features)
-            ])
-        
-        return preprocessor
-
-    def interpret_ml_query(self, query):
-        """Interpret ML-related queries"""
-        query_info = self.preprocess_query(query)
-        tokens = query_info['tokens']
-        
-        # Detect intent
-        if any(word in tokens for word in ['train', 'create', 'build']):
-            return 'train', self.extract_model_params(query_info)
-        
-        if any(word in tokens for word in ['predict', 'forecast', 'estimate']):
-            return 'predict', None
-            
-        if any(word in tokens for word in ['evaluate', 'performance', 'score']):
-            return 'evaluate', None
-            
-        if any(word in tokens for word in ['explain', 'interpret', 'importance']):
-            return 'explain', None
-            
-        return 'unknown', None
-
-    def train_model(self, data, target_col, model_type='auto', params=None):
-        """Train ML model with advanced preprocessing"""
+    def train_model(self, data, target_col):
+        """Train ML model with preprocessing"""
         try:
             X = data.drop(target_col, axis=1)
             y = data[target_col]
+            self.target = target_col
             
             # Determine if classification or regression
-            if model_type == 'auto':
-                if len(np.unique(y)) < 10 or y.dtype == 'object':
-                    model_type = 'classification'
-                else:
-                    model_type = 'regression'
+            if len(np.unique(y)) < 10 or y.dtype == 'object':
+                model_type = 'classification'
+                base_model = RandomForestClassifier()
+            else:
+                model_type = 'regression'
+                base_model = RandomForestRegressor()
             
             # Create preprocessing pipeline
-            preprocessor = self.create_model_pipeline(X)
+            numeric_features = X.select_dtypes(include=['int64', 'float64']).columns
+            categorical_features = X.select_dtypes(include=['object']).columns
             
-            # Select model
-            if model_type == 'classification':
-                model = self.classification_models.get(params.get('model', 'rf'))
-            else:
-                model = self.regression_models.get(params.get('model', 'rf'))
-            
-            # Update model parameters
-            if params:
-                model.set_params(**params)
-            
-            # Create full pipeline
-            self.model_pipeline = Pipeline([
-                ('preprocessor', preprocessor),
-                ('model', model)
+            numeric_transformer = Pipeline(steps=[
+                ('imputer', SimpleImputer(strategy='median')),
+                ('scaler', StandardScaler())
             ])
             
-            # Split data
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+            categorical_transformer = Pipeline(steps=[
+                ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
+                ('encoder', LabelEncoder())
+            ])
             
-            # Train model
+            preprocessor = ColumnTransformer(
+                transformers=[
+                    ('num', numeric_transformer, numeric_features),
+                    ('cat', categorical_transformer, categorical_features)
+                ])
+            
+            # Create and train pipeline
+            self.model_pipeline = Pipeline([
+                ('preprocessor', preprocessor),
+                ('model', base_model)
+            ])
+            
+            # Split data and train
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
             self.model_pipeline.fit(X_train, y_train)
             
             # Evaluate
@@ -225,153 +217,108 @@ class EnhancedMLChatbot:
                 accuracy = accuracy_score(y_test, y_pred)
                 f1 = f1_score(y_test, y_pred, average='weighted')
                 
-                results = {
-                    'accuracy': accuracy,
-                    'f1_score': f1,
-                    'confusion_matrix': confusion_matrix(y_test, y_pred)
-                }
+                response = (f"Model trained successfully!\n\n"
+                          f"Accuracy: {accuracy:.4f}\n"
+                          f"F1 Score: {f1:.4f}")
                 
-                # ROC AUC for binary classification
-                if len(np.unique(y)) == 2:
-                    y_prob = self.model_pipeline.predict_proba(X_test)[:, 1]
-                    results['roc_auc'] = roc_auc_score(y_test, y_prob)
+                # Feature importance
+                if hasattr(base_model, 'feature_importances_'):
+                    importance = pd.DataFrame({
+                        'feature': X.columns,
+                        'importance': base_model.feature_importances_
+                    }).sort_values('importance', ascending=False)
+                    
+                    response += "\n\nTop 5 Important Features:\n"
+                    for _, row in importance.head().iterrows():
+                        response += f"- {row['feature']}: {row['importance']:.4f}\n"
                 
             else:
                 mse = mean_squared_error(y_test, y_pred)
                 r2 = r2_score(y_test, y_pred)
                 
-                results = {
-                    'mse': mse,
-                    'rmse': np.sqrt(mse),
-                    'r2_score': r2
-                }
+                response = (f"Model trained successfully!\n\n"
+                          f"RMSE: {np.sqrt(mse):.4f}\n"
+                          f"R² Score: {r2:.4f}")
             
-            # Store feature importance if available
-            if hasattr(model, 'feature_importances_'):
-                self.feature_importance = pd.DataFrame({
-                    'feature': X.columns,
-                    'importance': model.feature_importances_
-                }).sort_values('importance', ascending=False)
-            
-            return results
+            return response
             
         except Exception as e:
             return f"Error training model: {str(e)}"
 
-    def process_query(self, query):
-        """Enhanced query processing"""
-        try:
-            # Preprocess query
-            query_info = self.preprocess_query(query)
+    def handle_visualization(self, query):
+        """Create visualizations based on query"""
+        data = st.session_state.data
+        
+        # Extract column names from query
+        columns = [col for col in data.columns if col.lower() in query.lower()]
+        
+        if not columns:
+            return "Please specify which columns you want to visualize."
+        
+        if 'scatter' in query and len(columns) >= 2:
+            fig = px.scatter(data, x=columns[0], y=columns[1], 
+                           title=f"Scatter Plot: {columns[0]} vs {columns[1]}")
+            st.plotly_chart(fig)
+            return "Here's your scatter plot!"
             
-            # Extract intent and parameters
-            intent, params = self.interpret_ml_query(query)
-            
-            if intent == 'train':
-                # Extract target variable
-                target_col = None
-                for token, pos in query_info['pos_tags']:
-                    if pos.startswith('NN') and token in st.session_state.data.columns:
-                        target_col = token
-                        break
-                
-                if not target_col:
-                    return "Please specify which column you want to predict."
-                
-                # Train model
-                results = self.train_model(st.session_state.data, target_col, params=params)
-                
-                # Format results
-                if isinstance(results, dict):
-                    response = "Model trained successfully!\n\n"
-                    for metric, value in results.items():
-                        if isinstance(value, (int, float)):
-                            response += f"{metric}: {value:.4f}\n"
-                    
-                    if self.feature_importance is not None:
-                        response += "\nTop 5 Important Features:\n"
-                        for _, row in self.feature_importance.head().iterrows():
-                            response += f"- {row['feature']}: {row['importance']:.4f}\n"
-                    
-                    return response
-                else:
-                    return results
-            
-            elif intent == 'predict':
-                if self.model_pipeline is None:
-                    return "Please train a model first!"
-                
-                # Create input interface for predictions
-                st.write("Enter values for prediction:")
-                input_data = {}
-                for col in st.session_state.data.columns:
-                    if col != self.target:
-                        input_data[col] = st.text_input(f"Enter {col}")
-                
-                if st.button("Predict"):
-                    try:
-                        input_df = pd.DataFrame([input_data])
-                        prediction = self.model_pipeline.predict(input_df)
-                        self.last_predictions = prediction
-                        return f"Prediction: {prediction[0]}"
-                    except Exception as e:
-                        return f"Error making prediction: {str(e)}"
-            
-            elif intent == 'evaluate':
-                if self.model_pipeline is None:
-                    return "Please train a model first!"
-                
-                # Perform cross-validation
-                scores = cross_val_score(self.model_pipeline, 
-                                      st.session_state.data.drop(self.target, axis=1),
-                                      st.session_state.data[self.target],
-                                      cv=5)
-                
-                return f"Cross-validation scores:\nMean: {scores.mean():.4f}\nStd: {scores.std():.4f}"
-            
-            elif intent == 'explain':
-                if self.feature_importance is None:
-                    return "No feature importance available. Please train a model that supports feature importance."
-                
-                # Create feature importance plot
-                fig = px.bar(self.feature_importance,
-                           x='feature',
-                           y='importance',
-                           title='Feature Importance')
-                st.plotly_chart(fig)
-                
-                return "Feature importance plot generated!"
-            
+        elif 'bar' in query and columns:
+            if data[columns[0]].dtype in ['int64', 'float64']:
+                fig = px.bar(data[columns[0]].value_counts().reset_index(),
+                           x='index', y=columns[0],
+                           title=f"Bar Plot of {columns[0]}")
             else:
-                return "I'm not sure how to help with that. Try asking about training a model, making predictions, or evaluating model performance."
-                
-        except Exception as e:
-            return f"Error processing query: {str(e)}"
+                fig = px.bar(data[columns[0]].value_counts().reset_index(),
+                           x='index', y='count',
+                           title=f"Bar Plot of {columns[0]}")
+            st.plotly_chart(fig)
+            return "Here's your bar plot!"
+            
+        elif 'histogram' in query and columns:
+            fig = px.histogram(data, x=columns[0],
+                             title=f"Histogram of {columns[0]}")
+            st.plotly_chart(fig)
+            return "Here's your histogram!"
+        
+        return "Please specify the type of plot (scatter, bar, histogram) and the columns to visualize."
+
+    def analyze_data(self, query):
+        """Analyze data based on query"""
+        data = st.session_state.data
+        
+        # Extract column names from query
+        columns = [col for col in data.columns if col.lower() in query.lower()]
+        
+        if not columns:
+            return "Please specify which columns you want to analyze."
+        
+        results = []
+        for col in columns:
+            if data[col].dtype in ['int64', 'float64']:
+                stats = data[col].describe()
+                results.append(f"\nStatistics for {col}:")
+                results.append(f"Mean: {stats['mean']:.2f}")
+                results.append(f"Std: {stats['std']:.2f}")
+                results.append(f"Min: {stats['min']:.2f}")
+                results.append(f"Max: {stats['max']:.2f}")
+            else:
+                value_counts = data[col].value_counts()
+                results.append(f"\nValue counts for {col}:")
+                for val, count in value_counts.items():
+                    results.append(f"{val}: {count}")
+        
+        return "\n".join(results)
 
 def main():
-    st.title("🤖 Enhanced ML Analysis Chatbot")
+    st.title("🤖 ML Analysis Chatbot")
     
-    # Initialize chatbot
-    if 'chatbot' not in st.session_state:
-        st.session_state.chatbot = EnhancedMLChatbot()
-    
-    # File upload
-    uploaded_file = st.file_uploader("Upload your dataset (CSV or Excel)", type=['csv', 'xlsx'])
-    if uploaded_file:
-        try:
-            if uploaded_file.name.endswith('.csv'):
-                data = pd.read_csv(uploaded_file)
-            else:
-                data = pd.read_excel(uploaded_file)
-            
-            st.session_state.data = data
-            st.success(f"Dataset loaded successfully! Shape: {data.shape}")
-        except Exception as e:
-            st.error(f"Error loading file: {str(e)}")
-    
-    # Chat interface
+    # Initialize session state
     if 'messages' not in st.session_state:
         st.session_state.messages = []
+    if 'data' not in st.session_state:
+        st.session_state.data = None
+    
+    # Initialize chatbot
+    chatbot = MLChatbot()
     
     # Display chat history
     for message in st.session_state.messages:
@@ -386,7 +333,7 @@ def main():
             st.markdown(prompt)
         
         # Get chatbot response
-        response = st.session_state.chatbot.process_query(prompt)
+        response = chatbot.process_query(prompt)
         
         # Add assistant response
         st.session_state.messages.append({"role": "assistant", "content": response})
