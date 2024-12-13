@@ -4,5 +4,4 @@ numpy
 plotly
 scikit-learn
 xgboost
-nltk
 openpyxl
