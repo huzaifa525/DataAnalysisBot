@@ -16,5 +16,5 @@ altair
 streamz
 dask
 holoviews
-tpot
+TPOT
 auto-sklearn
