@@ -16,6 +16,7 @@ from nltk.corpus import stopwords
 import spacy
 import os
 
+
 # Download spaCy model if not present
 if not spacy.util.is_package("en_core_web_sm"):
     os.system("python -m spacy download en_core_web_sm")
