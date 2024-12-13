@@ -150,6 +150,26 @@ class MLChatbot:
         except Exception as e:
             return f"Error analyzing distribution: {str(e)}"
 
+    def show_data_info(self, data):
+        try:
+            info = {
+                "Shape": data.shape,
+                "Columns": data.columns.tolist(),
+                "Data Types": data.dtypes.to_dict()
+            }
+            return info
+        except Exception as e:
+            return f"Error showing data info: {str(e)}"
+
+    def perform_correlation_analysis(self, data):
+        try:
+            corr_matrix = data.corr()
+            fig, ax = plt.subplots(figsize=(10, 8))
+            sns.heatmap(corr_matrix, annot=True, fmt=".2f", cmap="coolwarm", ax=ax)
+            st.pyplot(fig)
+        except Exception as e:
+            return f"Error performing correlation analysis: {str(e)}"
+
     def create_synthetic_data(self, data):
         try:
             discrete_columns = data.select_dtypes(include=['object']).columns.tolist()
@@ -191,11 +211,13 @@ if uploaded_file:
 
     st.sidebar.subheader("Data Overview")
     if st.sidebar.checkbox("Show Data Info"):
-        chatbot.show_data_info(data)
+        info = chatbot.show_data_info(data)
+        st.json(info)
 
     if st.sidebar.checkbox("Analyze Column"):
-        column = st.sidebar.selectbox("Select Column", options=data.columns)
-        chatbot.analyze_distribution(data, column)
+        column = st.sidebar.text_input("Enter Column Name")
+        if column:
+            st.text(chatbot.analyze_distribution(data, column))
 
     if st.sidebar.checkbox("Correlation Analysis"):
         chatbot.perform_correlation_analysis(data)
