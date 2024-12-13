@@ -12,20 +12,6 @@ from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
     mean_squared_error, r2_score, roc_auc_score, confusion_matrix
 )
-import re
-import nltk
-from nltk.tokenize import word_tokenize
-from nltk.corpus import stopwords
-
-# Download NLTK data
-try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
-    nltk.download('punkt')
-try:
-    nltk.data.find('corpora/stopwords')
-except LookupError:
-    nltk.download('stopwords')
 
 # Machine Learning Models
 from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge, Lasso
@@ -67,30 +53,30 @@ class MLChatbot:
     def process_query(self, query):
         """Process natural language queries"""
         query = query.lower()
-        tokens = word_tokenize(query)
+        words = query.split()
         
         try:
             # Data loading queries
-            if any(word in tokens for word in ['load', 'upload', 'import']):
+            if any(word in words for word in ['load', 'upload', 'import']):
                 return self.handle_data_upload()
             
             if st.session_state.data is None:
-                return "Please upload a dataset first! You can say 'load data' to upload a file."
+                return "Please upload a dataset first! Use the sidebar to upload your data file."
             
             # Show data info
-            if 'show' in tokens and ('data' in tokens or 'info' in tokens):
+            if 'show' in words and ('data' in words or 'info' in words):
                 return self.show_data_info()
             
             # Handle ML queries
-            if any(word in tokens for word in ['train', 'predict', 'model']):
+            if any(word in words for word in ['train', 'predict', 'model']):
                 return self.handle_ml_query(query)
             
             # Handle visualization queries
-            if any(word in tokens for word in ['plot', 'chart', 'graph', 'show']):
+            if any(word in words for word in ['plot', 'chart', 'graph', 'show']):
                 return self.handle_visualization(query)
             
             # Handle analysis queries
-            if any(word in tokens for word in ['analyze', 'analyse', 'statistics']):
+            if any(word in words for word in ['analyze', 'analyse', 'statistics']):
                 return self.analyze_data(query)
             
             return ("I can help you with:\n"
