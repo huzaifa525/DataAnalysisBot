@@ -4,7 +4,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.impute import SimpleImputer
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
@@ -87,7 +87,7 @@ class MLChatbot:
 
             categorical_transformer = Pipeline(steps=[
                 ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
-                ('encoder', LabelEncoder())
+                ('encoder', OneHotEncoder(handle_unknown='ignore'))
             ])
 
             preprocessor = ColumnTransformer(
@@ -150,9 +150,17 @@ class MLChatbot:
             return "Unsupported plot type"
         st.plotly_chart(fig)
 
+    def perform_correlation_analysis(self, data):
+        corr_matrix = data.corr()
+        fig = px.imshow(corr_matrix, title="Correlation Matrix")
+        st.plotly_chart(fig)
 
 # Streamlit App
 st.title("ML Analysis Chatbot")
+
+if 'messages' not in st.session_state:
+    st.session_state['messages'] = []
+
 st.sidebar.header("Upload Dataset")
 
 uploaded_file = st.sidebar.file_uploader("Upload your dataset", type=['csv', 'xlsx'])
@@ -169,9 +177,24 @@ if uploaded_file:
         column = st.sidebar.selectbox("Select Column", options=data.columns)
         chatbot.analyze_distribution(data, column)
 
+    if st.sidebar.checkbox("Correlation Analysis"):
+        chatbot.perform_correlation_analysis(data)
+
     st.sidebar.subheader("Train Model")
     target_col = st.sidebar.selectbox("Select Target Column", options=data.columns)
     model_type = st.sidebar.radio("Model Type", ['classification', 'regression'])
     if st.sidebar.button("Train Model"):
         result = chatbot.train_model(data, target_col, model_type)
         st.success(result)
+
+# Chat Interface
+st.header("Chat with your data!")
+for message in st.session_state['messages']:
+    st.write(message)
+
+user_input = st.text_input("Ask about your data:")
+if user_input:
+    st.session_state['messages'].append(f"User: {user_input}")
+    response = chatbot.analyze_distribution(data, user_input)  # Add query handling logic
+    st.session_state['messages'].append(f"Chatbot: {response}")
+    st.write(f"Chatbot: {response}")
