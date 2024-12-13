@@ -14,14 +14,20 @@ import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 import spacy
+import os
+
+# Download spaCy model if not present
+if not spacy.util.is_package("en_core_web_sm"):
+    os.system("python -m spacy download en_core_web_sm")
+
+# Load spaCy model
+nlp = spacy.load("en_core_web_sm")
+
 
 # Download required NLTK data
 nltk.download('punkt')
 nltk.download('stopwords')
 nltk.download('averaged_perceptron_tagger')
-
-# Load spaCy model
-nlp = spacy.load('en_core_web_sm')
 
 # ML Models
 from sklearn.linear_model import (
