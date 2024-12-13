@@ -40,7 +40,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.svm import SVC
 from xgboost import XGBClassifier
 from sklearn.neural_network import MLPClassifier
-from TPOT import TPOTClassifier
+from tpot import TPOTClassifier
 from autosklearn.classification import AutoSklearnClassifier
 from autosklearn.regression import AutoSklearnRegressor
 from mlxtend.frequent_patterns import apriori, association_rules
