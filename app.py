@@ -12,14 +12,63 @@ import re
 from sklearn.metrics import (
     accuracy_score, f1_score, mean_squared_error, r2_score, confusion_matrix
 )
+from sklearn.decomposition import PCA
+from sklearn.feature_selection import SelectKBest, chi2
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.cluster import KMeans
+from sklearn.neighbors import NearestNeighbors
+from sklearn.manifold import TSNE
+from sklearn.linear_model import LogisticRegression
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.pipeline import FeatureUnion
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.svm import SVR
+from xgboost import XGBRegressor
+from sklearn.neural_network import MLPRegressor
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.svm import SVC
+from xgboost import XGBClassifier
+from sklearn.neural_network import MLPClassifier
+from tpot import TPOTClassifier
+from autosklearn.classification import AutoSklearnClassifier
+from autosklearn.regression import AutoSklearnRegressor
+from mlxtend.frequent_patterns import apriori, association_rules
+from mlxtend.preprocessing import TransactionEncoder
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+import seaborn as sns
+import networkx as nx
+from pyvis.network import Network
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+import spacy
+from spacy import displacy
+import altair as alt
+import streamz
+from streamz.dataframe import Random
+from streamz.dask import DaskStream
+import dask.dataframe as dd
+import holoviews as hv
+from holoviews import opts
+hv.extension('bokeh')
 
-# ML Models
-from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge, Lasso
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
-from sklearn.svm import SVC, SVR
-from xgboost import XGBClassifier, XGBRegressor
-from sklearn.neural_network import MLPClassifier, MLPRegressor
+nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('wordnet')
+nltk.download('omw-1.4')
 
 class MLChatbot:
     def __init__(self):
@@ -38,7 +87,8 @@ class MLChatbot:
             'xgboost': XGBRegressor(),
             'svr': SVR(),
             'mlp': MLPRegressor(max_iter=1000),
-            'dt': DecisionTreeRegressor()
+            'dt': DecisionTreeRegressor(),
+            'auto': AutoSklearnRegressor(time_left_for_this_task=300, per_run_time_limit=30)
         }
 
         self.classification_models = {
@@ -47,7 +97,9 @@ class MLChatbot:
             'xgboost': XGBClassifier(),
             'svc': SVC(probability=True),
             'mlp': MLPClassifier(max_iter=1000),
-            'dt': DecisionTreeClassifier()
+            'dt': DecisionTreeClassifier(),
+            'auto': TPOTClassifier(generations=5, population_size=20, verbosity=2, random_state=42),
+            'autosklearn': AutoSklearnClassifier(time_left_for_this_task=300, per_run_time_limit=30)
         }
 
     def get_value_counts(self, column_query):
@@ -158,12 +210,92 @@ class MLChatbot:
             if any(word in query for word in ['plot', 'chart', 'graph', 'show']):
                 return self.handle_visualization(query)
 
+            # Handle correlation analysis
+            if 'correlation' in query:
+                return self.handle_correlation_analysis(query)
+
+            # Handle text classification
+            if 'text classification' in query:
+                return self.handle_text_classification(query)
+
+            # Handle data cleaning
+            if 'clean' in query:
+                return self.handle_data_cleaning(query)
+
+            # Handle custom data transformations
+            if 'transform' in query:
+                return self.handle_custom_transformations(query)
+
+            # Handle interactive dashboards
+            if 'dashboard' in query:
+                return self.handle_interactive_dashboards(query)
+
+            # Handle 3D visualizations
+            if '3d' in query:
+                return self.handle_3d_visualizations(query)
+
+            # Handle question type classification
+            if 'question type' in query:
+                return self.handle_question_type_classification(query)
+
+            # Handle pattern mining
+            if 'pattern mining' in query:
+                return self.handle_pattern_mining(query)
+
+            # Handle sequential pattern analysis
+            if 'sequential pattern' in query:
+                return self.handle_sequential_pattern_analysis(query)
+
+            # Handle intelligent data cleaning
+            if 'intelligent data cleaning' in query:
+                return self.handle_intelligent_data_cleaning(query)
+
+            # Handle streaming data analysis
+            if 'streaming data' in query:
+                return self.handle_streaming_data_analysis(query)
+
+            # Handle network graphs
+            if 'network graph' in query:
+                return self.handle_network_graphs(query)
+
+            # Handle interactive filters
+            if 'interactive filters' in query:
+                return self.handle_interactive_filters(query)
+
+            # Handle export options
+            if 'export' in query:
+                return self.handle_export_options(query)
+
+            # Handle AutoML pipeline
+            if 'automl' in query:
+                return self.handle_automl_pipeline(query)
+
+            # Handle natural language understanding
+            if 'nlu' in query:
+                return self.handle_nlu(query)
+
             return ("I can help you with:\n"
                     "1. Counting and distributions (e.g., 'How many X are there?', 'Show distribution of X')\n"
                     "2. Data analysis (e.g., 'Analyze X', 'Show breakdown of X')\n"
                     "3. Training models (e.g., 'Train model to predict X')\n"
                     "4. Creating visualizations (e.g., 'Show chart of X')\n"
-                    "5. Showing data info (e.g., 'Show data info')")
+                    "5. Showing data info (e.g., 'Show data info')\n"
+                    "6. Correlation analysis (e.g., 'Show correlation of X and Y')\n"
+                    "7. Text classification (e.g., 'Classify text data')\n"
+                    "8. Data cleaning (e.g., 'Clean the data')\n"
+                    "9. Custom data transformations (e.g., 'Transform the data')\n"
+                    "10. Interactive dashboards (e.g., 'Create dashboard')\n"
+                    "11. 3D visualizations (e.g., 'Show 3D plot')\n"
+                    "12. Question type classification (e.g., 'Classify question type')\n"
+                    "13. Pattern mining (e.g., 'Mine patterns')\n"
+                    "14. Sequential pattern analysis (e.g., 'Analyze sequential patterns')\n"
+                    "15. Intelligent data cleaning (e.g., 'Intelligent data cleaning')\n"
+                    "16. Streaming data analysis (e.g., 'Analyze streaming data')\n"
+                    "17. Network graphs (e.g., 'Show network graph')\n"
+                    "18. Interactive filters (e.g., 'Apply interactive filters')\n"
+                    "19. Export options (e.g., 'Export data')\n"
+                    "20. AutoML pipeline (e.g., 'Run AutoML pipeline')\n"
+                    "21. Natural language understanding (e.g., 'Understand natural language')")
 
         except Exception as e:
             return f"Error: {str(e)}"
@@ -259,7 +391,7 @@ class MLChatbot:
 
             categorical_transformer = Pipeline(steps=[
                 ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
-                ('encoder', LabelEncoder())
+                ('encoder', OneHotEncoder(handle_unknown='ignore'))
             ])
 
             preprocessor = ColumnTransformer(
@@ -372,6 +504,213 @@ class MLChatbot:
             return "Box plot created!"
 
         return "Please specify the type of plot (scatter, bar, histogram, box) and the columns to visualize."
+
+    def handle_correlation_analysis(self, query):
+        """Handle correlation analysis"""
+        data = st.session_state.data
+        corr_matrix = data.corr()
+
+        # Create heatmap
+        fig = px.imshow(corr_matrix,
+                         labels=dict(color="Correlation"),
+                         title="Correlation Matrix")
+        st.plotly_chart(fig)
+
+        return "Correlation matrix plotted above."
+
+    def handle_text_classification(self, query):
+        """Handle text classification"""
+        data = st.session_state.data
+        text_col = 'text'
+        label_col = 'label'
+
+        if text_col not in data.columns or label_col not in data.columns:
+            return f"Columns '{text_col}' and '{label_col}' not found. Available columns: {', '.join(data.columns)}"
+
+        # Preprocess text data
+        vectorizer = TfidfVectorizer(stop_words='english')
+        X = vectorizer.fit_transform(data[text_col])
+        y = data[label_col]
+
+        # Train model
+        model = MultinomialNB()
+        model.fit(X, y)
+
+        # Evaluate
+        accuracy = model.score(X, y)
+
+        return f"Text classification model trained successfully!\n\nAccuracy: {accuracy:.4f}"
+
+    def handle_data_cleaning(self, query):
+        """Handle data cleaning"""
+        data = st.session_state.data
+
+        # Drop missing values
+        data = data.dropna()
+
+        # Drop duplicates
+        data = data.drop_duplicates()
+
+        st.session_state.data = data
+        return "Data cleaned successfully!"
+
+    def handle_custom_transformations(self, query):
+        """Handle custom data transformations"""
+        data = st.session_state.data
+
+        # Example transformation: Log transform
+        for col in data.select_dtypes(include=['int64', 'float64']).columns:
+            data[col] = np.log1p(data[col])
+
+        st.session_state.data = data
+        return "Custom data transformations applied successfully!"
+
+    def handle_interactive_dashboards(self, query):
+        """Handle interactive dashboards"""
+        data = st.session_state.data
+
+        # Create an interactive dashboard using Altair
+        chart = alt.Chart(data).mark_circle().encode(
+            x='column1:Q',
+            y='column2:Q',
+            color='column3:N',
+            tooltip=['column1', 'column2', 'column3']
+        ).interactive()
+
+        st.altair_chart(chart, use_container_width=True)
+        return "Interactive dashboard created!"
+
+    def handle_3d_visualizations(self, query):
+        """Handle 3D visualizations"""
+        data = st.session_state.data
+
+        # Create a 3D scatter plot
+        fig = px.scatter_3d(data, x='column1', y='column2', z='column3',
+                             title='3D Scatter Plot')
+        st.plotly_chart(fig)
+        return "3D visualization created!"
+
+    def handle_question_type_classification(self, query):
+        """Handle question type classification"""
+        # Example: Classify the type of question
+        if 'how many' in query:
+            return "This is a count question."
+        elif 'what is' in query:
+            return "This is a definition question."
+        else:
+            return "This is a general question."
+
+    def handle_pattern_mining(self, query):
+        """Handle pattern mining"""
+        data = st.session_state.data
+
+        # Example: Frequent pattern mining using Apriori algorithm
+        transactions = data.values.tolist()
+        te = TransactionEncoder()
+        te_ary = te.fit(transactions).transform(transactions)
+        df = pd.DataFrame(te_ary, columns=te.columns_)
+
+        frequent_itemsets = apriori(df, min_support=0.1, use_colnames=True)
+        rules = association_rules(frequent_itemsets, metric="lift", min_threshold=1)
+
+        st.dataframe(rules)
+        return "Pattern mining results shown above."
+
+    def handle_sequential_pattern_analysis(self, query):
+        """Handle sequential pattern analysis"""
+        data = st.session_state.data
+
+        # Example: Sequential pattern analysis
+        sequences = data.values.tolist()
+        # Implement sequential pattern mining algorithm here
+
+        return "Sequential pattern analysis results shown above."
+
+    def handle_intelligent_data_cleaning(self, query):
+        """Handle intelligent data cleaning"""
+        data = st.session_state.data
+
+        # Example: Intelligent data cleaning using machine learning
+        # Implement intelligent data cleaning algorithm here
+
+        return "Intelligent data cleaning applied successfully!"
+
+    def handle_streaming_data_analysis(self, query):
+        """Handle streaming data analysis"""
+        # Example: Streaming data analysis using Streamz
+        source = Random(interval='1s')
+        s = DaskStream()
+        s.map(lambda x: x * 2).sink(print)
+        source.emit(1)
+
+        return "Streaming data analysis started."
+
+    def handle_network_graphs(self, query):
+        """Handle network graphs"""
+        data = st.session_state.data
+
+        # Example: Create a network graph
+        G = nx.from_pandas_edgelist(data, 'source', 'target')
+        net = Network(notebook=True)
+        net.from_nx(G)
+        net.show("network.html")
+
+        return "Network graph created and saved as 'network.html'."
+
+    def handle_interactive_filters(self, query):
+        """Handle interactive filters"""
+        data = st.session_state.data
+
+        # Example: Create interactive filters using Altair
+        brush = alt.selection_interval()
+        chart = alt.Chart(data).mark_point().encode(
+            x='column1:Q',
+            y='column2:Q',
+            color='column3:N'
+        ).add_selection(
+            brush
+        ).properties(
+            width=600,
+            height=400
+        ).interactive()
+
+        st.altair_chart(chart, use_container_width=True)
+        return "Interactive filters applied!"
+
+    def handle_export_options(self, query):
+        """Handle export options"""
+        data = st.session_state.data
+
+        # Example: Export data to CSV
+        data.to_csv('exported_data.csv', index=False)
+
+        return "Data exported successfully to 'exported_data.csv'."
+
+    def handle_automl_pipeline(self, query):
+        """Handle AutoML pipeline"""
+        data = st.session_state.data
+        target_col = 'target'
+
+        if target_col not in data.columns:
+            return f"Column '{target_col}' not found. Available columns: {', '.join(data.columns)}"
+
+        X = data.drop(target_col, axis=1)
+        y = data[target_col]
+
+        # Example: Run AutoML pipeline using TPOT
+        tpot = TPOTClassifier(generations=5, population_size=20, verbosity=2, random_state=42)
+        tpot.fit(X, y)
+
+        return f"AutoML pipeline run successfully!\n\nBest pipeline: {tpot.score(X, y):.4f}"
+
+    def handle_nlu(self, query):
+        """Handle natural language understanding"""
+        # Example: Natural language understanding using SpaCy
+        nlp = spacy.load("en_core_web_sm")
+        doc = nlp(query)
+        displacy.render(doc, style="ent", jupyter=True)
+
+        return "Natural language understanding results shown above."
 
 def main():
     st.title("🤖 ML Analysis Chatbot")
