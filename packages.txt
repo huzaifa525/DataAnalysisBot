@@ -1,2 +1,2 @@
-python-dev-tools
+python3-dev
 build-essential
