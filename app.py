@@ -104,23 +104,14 @@ class MLChatbot:
             return f"Error: {str(e)}"
 
     def handle_data_upload(self):
-        """Handle data upload"""
-        uploaded_file = st.file_uploader("Choose a CSV or Excel file", type=['csv', 'xlsx'])
-        
-        if uploaded_file:
-            try:
-                if uploaded_file.name.endswith('.csv'):
-                    data = pd.read_csv(uploaded_file)
-                else:
-                    data = pd.read_excel(uploaded_file)
-                
-                st.session_state.data = data
-                return (f"Dataset loaded! Shape: {data.shape}\n\n"
-                       f"Columns: {', '.join(data.columns)}\n\n"
-                       "You can now analyze this data!")
-            except Exception as e:
-                return f"Error loading file: {str(e)}"
-        return "Please upload a file to continue."
+        """Handle data upload request"""
+        if st.session_state.data is not None:
+            data = st.session_state.data
+            return (f"Current dataset info:\n"
+                   f"- Shape: {data.shape}\n"
+                   f"- Columns: {', '.join(data.columns)}\n\n"
+                   f"You can start analyzing this data!")
+        return "Please use the sidebar to upload your data file (CSV or Excel)."
 
     def handle_ml_query(self, query):
         """Handle machine learning queries"""
@@ -316,6 +307,39 @@ def main():
         st.session_state.messages = []
     if 'data' not in st.session_state:
         st.session_state.data = None
+    
+    # Sidebar for file upload and data info
+    with st.sidebar:
+        st.header("📁 Data Upload")
+        uploaded_file = st.file_uploader("Upload your dataset", type=['csv', 'xlsx'])
+        
+        if uploaded_file:
+            try:
+                # Show loading spinner
+                with st.spinner('Loading data...'):
+                    if uploaded_file.name.endswith('.csv'):
+                        data = pd.read_csv(uploaded_file)
+                    else:
+                        data = pd.read_excel(uploaded_file)
+                    
+                    st.session_state.data = data
+                    st.success(f"✅ File uploaded successfully!")
+                    
+                    # Show data info in sidebar
+                    st.header("📊 Data Info")
+                    st.write(f"Rows: {data.shape[0]}")
+                    st.write(f"Columns: {data.shape[1]}")
+                    
+                    # Show sample of the data
+                    st.write("Preview:")
+                    st.dataframe(data.head(3), use_container_width=True)
+                    
+                    # Show column info
+                    st.write("Columns:")
+                    for col in data.columns:
+                        st.write(f"- {col} ({data[col].dtype})")
+            except Exception as e:
+                st.error(f"Error loading file: {str(e)}")
     
     # Initialize chatbot
     chatbot = MLChatbot()
