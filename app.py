@@ -32,7 +32,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.svm import SVR
-from xgboost import XGBRegressor
+from xgboost import XGBRegressor, XGBClassifier
 from sklearn.neural_network import MLPRegressor
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
@@ -40,9 +40,6 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.svm import SVC
 from xgboost import XGBClassifier
 from sklearn.neural_network import MLPClassifier
-from tpot import TPOTClassifier
-from autosklearn.classification import AutoSklearnClassifier
-from autosklearn.regression import AutoSklearnRegressor
 from mlxtend.frequent_patterns import apriori, association_rules
 from mlxtend.preprocessing import TransactionEncoder
 from wordcloud import WordCloud
@@ -87,8 +84,7 @@ class MLChatbot:
             'xgboost': XGBRegressor(),
             'svr': SVR(),
             'mlp': MLPRegressor(max_iter=1000),
-            'dt': DecisionTreeRegressor(),
-            'auto': AutoSklearnRegressor(time_left_for_this_task=300, per_run_time_limit=30)
+            'dt': DecisionTreeRegressor()
         }
 
         self.classification_models = {
@@ -97,9 +93,7 @@ class MLChatbot:
             'xgboost': XGBClassifier(),
             'svc': SVC(probability=True),
             'mlp': MLPClassifier(max_iter=1000),
-            'dt': DecisionTreeClassifier(),
-            'auto': TPOTClassifier(generations=5, population_size=20, verbosity=2, random_state=42),
-            'autosklearn': AutoSklearnClassifier(time_left_for_this_task=300, per_run_time_limit=30)
+            'dt': DecisionTreeClassifier()
         }
 
     def get_value_counts(self, column_query):
@@ -375,10 +369,10 @@ class MLChatbot:
             # Determine if classification or regression
             if len(np.unique(y)) < 10 or y.dtype == 'object':
                 model_type = 'classification'
-                base_model = self.classification_models['rf']
+                base_model = self.classification_models['xgboost']
             else:
                 model_type = 'regression'
-                base_model = self.regression_models['rf']
+                base_model = self.regression_models['xgboost']
 
             # Create preprocessing pipeline
             numeric_features = X.select_dtypes(include=['int64', 'float64']).columns
@@ -499,7 +493,7 @@ class MLChatbot:
 
         elif 'box' in query and cols:
             fig = px.box(data, y=cols[0],
-                         title=f"Box Plot of {cols[0]}")
+                          title=f"Box Plot of {cols[0]}")
             st.plotly_chart(fig)
             return "Box plot created!"
 
@@ -697,11 +691,11 @@ class MLChatbot:
         X = data.drop(target_col, axis=1)
         y = data[target_col]
 
-        # Example: Run AutoML pipeline using TPOT
-        tpot = TPOTClassifier(generations=5, population_size=20, verbosity=2, random_state=42)
-        tpot.fit(X, y)
+        # Example: Run AutoML pipeline using XGBoost
+        model = XGBClassifier()
+        model.fit(X, y)
 
-        return f"AutoML pipeline run successfully!\n\nBest pipeline: {tpot.score(X, y):.4f}"
+        return f"AutoML pipeline run successfully!\n\nBest pipeline: {model.score(X, y):.4f}"
 
     def handle_nlu(self, query):
         """Handle natural language understanding"""
