@@ -3,9 +3,12 @@ pandas
 numpy
 scikit-learn
 xgboost
+transformers
+ctgan
 plotly
 matplotlib
 seaborn
 nltk
-spacy
 wordcloud
+pytesseract
+Pillow
