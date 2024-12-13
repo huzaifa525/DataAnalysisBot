@@ -20,6 +20,8 @@ from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.svm import SVC, SVR
 from xgboost import XGBClassifier, XGBRegressor
 from sklearn.neural_network import MLPClassifier, MLPRegressor
+from transformers import pipeline
+from ctgan import CTGAN
 import matplotlib.pyplot as plt
 import seaborn as sns
 import nltk
@@ -27,6 +29,8 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
 from wordcloud import WordCloud
+import pytesseract
+from PIL import Image
 
 nltk.download('punkt')
 nltk.download('stopwords')
@@ -51,6 +55,7 @@ class MLChatbot:
         self.model = None
         self.target = None
         self.model_pipeline = None
+        self.text_generator = pipeline("text-generation", model="gpt2")
 
         # Available models
         self.regression_models = {
@@ -124,36 +129,51 @@ class MLChatbot:
         except Exception as e:
             return f"Error training model: {str(e)}"
 
-    def analyze_distribution(self, data, column):
-        if column in data.columns:
-            if data[column].dtype in ['int64', 'float64']:
-                fig = px.histogram(data, x=column, nbins=30, title=f"Distribution of {column}")
-                st.plotly_chart(fig)
-            else:
-                value_counts = data[column].value_counts()
-                fig = px.bar(value_counts, title=f"Distribution of {column}")
-                st.plotly_chart(fig)
+    def analyze_distribution(self, data, column_query):
+        try:
+            matching_cols = [col for col in data.columns if column_query.lower() in col.lower()]
 
-    def show_data_info(self, data):
-        st.write(f"Data shape: {data.shape}")
-        st.write("Columns:")
-        st.write(data.dtypes)
+            if not matching_cols:
+                return f"Column containing '{column_query}' not found. Available columns: {', '.join(data.columns)}"
 
-    def handle_visualizations(self, data, x_col, y_col, plot_type):
-        if plot_type == 'scatter':
-            fig = px.scatter(data, x=x_col, y=y_col)
-        elif plot_type == 'bar':
-            fig = px.bar(data, x=x_col, y=y_col)
-        elif plot_type == 'box':
-            fig = px.box(data, y=y_col)
-        else:
-            return "Unsupported plot type"
-        st.plotly_chart(fig)
+            col = matching_cols[0]
+            value_counts = data[col].value_counts()
 
-    def perform_correlation_analysis(self, data):
-        corr_matrix = data.corr()
-        fig = px.imshow(corr_matrix, title="Correlation Matrix")
-        st.plotly_chart(fig)
+            response = f"\nDistribution of {col}:\n"
+            for value, count in value_counts.items():
+                percentage = (count / len(data)) * 100
+                response += f"- {value}: {count} ({percentage:.1f}%)\n"
+
+            response += f"\nTotal unique values: {len(value_counts)}"
+            return response
+
+        except Exception as e:
+            return f"Error analyzing distribution: {str(e)}"
+
+    def create_synthetic_data(self, data):
+        try:
+            discrete_columns = data.select_dtypes(include=['object']).columns.tolist()
+            ctgan = CTGAN()
+            ctgan.fit(data, discrete_columns=discrete_columns)
+            synthetic_data = ctgan.sample(len(data))
+            return synthetic_data
+        except Exception as e:
+            return f"Error creating synthetic data: {str(e)}"
+
+    def generate_text_insights(self, prompt):
+        try:
+            result = self.text_generator(prompt, max_length=50, num_return_sequences=1)
+            return result[0]['generated_text']
+        except Exception as e:
+            return f"Error generating insights: {str(e)}"
+
+    def enhance_data_quality(self, data):
+        try:
+            for col in data.select_dtypes(include=['float64', 'int64']).columns:
+                data[col].fillna(data[col].median(), inplace=True)
+            return "Data quality enhanced with missing values handled."
+        except Exception as e:
+            return f"Error enhancing data quality: {str(e)}"
 
 # Streamlit App
 st.title("ML Analysis Chatbot")
@@ -180,6 +200,19 @@ if uploaded_file:
     if st.sidebar.checkbox("Correlation Analysis"):
         chatbot.perform_correlation_analysis(data)
 
+    if st.sidebar.checkbox("Create Synthetic Data"):
+        synthetic_data = chatbot.create_synthetic_data(data)
+        st.write(synthetic_data)
+
+    if st.sidebar.checkbox("Generate Text Insights"):
+        prompt = st.text_input("Enter prompt for insights:")
+        if prompt:
+            insights = chatbot.generate_text_insights(prompt)
+            st.text(insights)
+
+    if st.sidebar.checkbox("Enhance Data Quality"):
+        st.text(chatbot.enhance_data_quality(data))
+
     st.sidebar.subheader("Train Model")
     target_col = st.sidebar.selectbox("Select Target Column", options=data.columns)
     model_type = st.sidebar.radio("Model Type", ['classification', 'regression'])
@@ -195,6 +228,6 @@ for message in st.session_state['messages']:
 user_input = st.text_input("Ask about your data:")
 if user_input:
     st.session_state['messages'].append(f"User: {user_input}")
-    response = chatbot.analyze_distribution(data, user_input)  # Add query handling logic
+    response = chatbot.analyze_distribution(data, user_input)
     st.session_state['messages'].append(f"Chatbot: {response}")
     st.write(f"Chatbot: {response}")
