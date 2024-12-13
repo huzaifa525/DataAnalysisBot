@@ -26,8 +26,6 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
-import spacy
-from spacy import displacy
 from wordcloud import WordCloud
 
 nltk.download('punkt')
